@@ -11,7 +11,7 @@ def get_sp500_tickers():
     
     # Obtain S&P500 tickers from Wikipedia page and store in df
     res = requests.get("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
-    soup = BeautifulSoup(res.content,'lxml')
+    soup = BeautifulSoup(res.content,'html')
     table = soup.find_all('table')[0]
     df = pd.read_html(str(table))
 
@@ -34,7 +34,7 @@ def get_history(ticker, period_start, period_end, granularity="1d", tries=0):
         ).reset_index()
     except Exception as err:
         if tries < 5:
-            return get_history(ticker, period_start, period_end, granularity, tries + 1)
+            return get_history(ticker, period_start, period_end, granularity, tries+1)
         return pd.DataFrame()
     
     # Renaming the columns of the df
@@ -44,7 +44,7 @@ def get_history(ticker, period_start, period_end, granularity="1d", tries=0):
         "High":"high",
         "Low":"low",
         "Close":"close",
-        "Volume":"volume",
+        "Volume":"volume"
     })
 
     # If resulting df is empty, return an empty df
@@ -114,7 +114,6 @@ def get_ticker_dfs(start, end):
     return tickers, ticker_dfs
 
 period_start = datetime(2010,1,1, tzinfo = pytz.utc) 
-# period_end = datetime(2023,8,31, tzinfo = pytz.utc)
 
 # Current date
 period_end = datetime.now(pytz.utc)
@@ -124,9 +123,7 @@ tickers, ticker_dfs = get_ticker_dfs(start=period_start, end=period_end)
 testfor = 20
 tickers = tickers[:testfor]
 
-# input(ticker_dfs)
-
-from alpha1set2 import Alpha1
+from alpha1 import Alpha1
 alpha1 = Alpha1(insts=tickers, dfs=ticker_dfs, start=period_start, end=period_end)
 df1 = alpha1.run_simulation()
 print(df1)
