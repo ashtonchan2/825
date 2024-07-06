@@ -79,7 +79,14 @@ class Alpha1():
             self.dfs[inst]["eligible"] = eligible.astype(int) & (self.dfs[inst]["close"] > 0).astype(int)
         
         temp_df = pd.concat(op4s, axis=1)
-        input(temp_df)
+        temp_df.columns = self.insts
+        temp_df = temp_df.replace(np.inf, 0).replace(np.inf, 0)
+        zscore = lambda x: (x - np.mean(x)) / np.std(x)
+        cszcre_df = temp_df.ffill().apply(zscore, axis=1)
+        
+        for inst in self.insts:
+            self.dfs[inst]["alpha"] = cszcre_df[inst].rolling(12).mean() * -1
+            self.dfs[inst]["eligible"] = self.dfs[inst]["eligible"] & (~pd.isna(self.dfs[inst]["alpha"]))
         
         return
     
@@ -88,12 +95,12 @@ class Alpha1():
         print("running backtest")
         
         # OLD
-        # date_range = pd.date_range(start=self.start, end=self.end, freq="D")
+        date_range = pd.date_range(start=self.start, end=self.end, freq="D")
         
         # NEW
-        start = self.start + timedelta(hours=5)
-        end = self.end + timedelta(hours=5)
-        date_range = pd.date_range(start, end, freq="D")
+        # start = self.start + timedelta(hours=5)
+        # end = self.end + timedelta(hours=5)
+        # date_range = pd.date_range(start, end, freq="D")
         
         self.compute_meta_info(trade_range=date_range)
         
@@ -127,12 +134,9 @@ class Alpha1():
                 )
             
             alpha_scores = {}
-            
-            # Compute alpha signals (random for demonstrative purposes)
-            import random
-            
+        
             for inst in eligibles:
-                alpha_scores[inst] = random.uniform(0,1)
+                alpha_scores[inst] = self.dfs[inst].loc[date, "alpha"]
             
             # Trade top 25% "high" alpha tickers
             # Short bottom 25% "low" alpha tickers
@@ -199,5 +203,4 @@ class Alpha1():
         print(alpha_short)
         
         return portfolio_df 
-
-            # compute positions and other information
+    

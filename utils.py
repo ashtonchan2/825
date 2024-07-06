@@ -53,7 +53,7 @@ def get_pnl_stats(date, prev, portfolio_df, insts, idx, dfs):
 
 import pandas as pd
 import numpy as np
-from datetime import timedelta
+# from datetime import timedelta
 
 class Alpha():
 
@@ -108,12 +108,12 @@ class Alpha():
         print("running backtest")
         
         # OLD
-        # date_range = pd.date_range(start=self.start, end=self.end, freq="D")
+        date_range = pd.date_range(start=self.start, end=self.end, freq="D")
         
         # NEW
-        start = self.start + timedelta(hours=5)
-        end = self.end + timedelta(hours=5)
-        date_range = pd.date_range(start, end, freq="D")
+        # start = self.start + timedelta(hours=5)
+        # end = self.end + timedelta(hours=5)
+        # date_range = pd.date_range(start, end, freq="D")
         
         self.compute_meta_info(trade_range=date_range)
         

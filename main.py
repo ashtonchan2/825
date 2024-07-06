@@ -51,14 +51,16 @@ def get_history(ticker, period_start, period_end, granularity="1d", tries=0):
     if df.empty:
         return pd.DataFrame()
     
-    # Convert the times to UTC for consistency across data
-    df["datetime"] = df["datetime"].dt.tz_convert(pytz.utc)
+    df.datetime = pd.DatetimeIndex(df.datetime.dt.date).tz_localize(pytz.utc)
     
-    # Set the index to the date / time
-    df = df.set_index("datetime", drop=True)
+    # Convert the times to UTC for consistency across data
+    df["datetime"] = df["datetime"].dt.tz_localize(pytz.utc)
     
     # Drop the dividends and stock splits data
     df = df.drop(columns=["Dividends", "Stock Splits"])
+    
+    # Set the index to the date / time
+    df = df.set_index("datetime", drop=True)
     
     return df
 
@@ -113,10 +115,11 @@ def get_ticker_dfs(start, end):
         
     return tickers, ticker_dfs
 
-from utils import Alpha
-
 period_start = datetime(2010,1,1, tzinfo = pytz.utc) 
-period_end = datetime.now(pytz.utc)
+period_end = datetime(2023,8,31, tzinfo = pytz.utc)
+
+# Current date
+# period_end = datetime.now(pytz.utc)
 
 tickers, ticker_dfs = get_ticker_dfs(start=period_start, end=period_end)
 
