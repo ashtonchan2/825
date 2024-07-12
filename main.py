@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 # Obtain S&P 500 tickers as a list
 def get_sp500_tickers():
     
-    # Obtain S&P500 tickers from Wikipedia page and store in df
+    # Scrape S&P500 tickers from Wikipedia page and store in df
     res = requests.get("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
     soup = BeautifulSoup(res.content,'html')
     table = soup.find_all('table')[0]
@@ -91,7 +91,7 @@ def get_histories(tickers, period_starts, period_ends, granularity="1d"):
     
     return tickers, dfs
 
-# Creating a dictionary of tickers and their corresponding historical OHLCV data
+# Creating a dictionary of tickers and their corresponding historical OHLCV data, caching
 def get_ticker_dfs(start, end):
     
     from utils import load_pickle, save_pickle

@@ -190,10 +190,6 @@ class Alpha1():
 
             if i % 100 == 0: print(portfolio_df.loc[i])
             # input(portfolio_df.loc[i])
-            
-        print(alpha_scores)
-        print(alpha_long)
-        print(alpha_short)
         
         return portfolio_df 
     
