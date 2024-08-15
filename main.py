@@ -135,6 +135,23 @@ alpha2 = Alpha2(insts=tickers, dfs=ticker_dfs, start=period_start, end=period_en
 alpha3 = Alpha3(insts=tickers, dfs=ticker_dfs, start=period_start, end=period_end)
 
 df1 = alpha1.run_simulation()
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# remove non-zero values from capital returns
+nzr = lambda df: df.capital_ret.loc[df.capital_ret != 0].fillna(0)
+
+def plot_vol(r):
+
+    vol = r.rolling(25).std() * np.sqrt(253)
+    plt.plot(vol)
+    plt.show()
+    plt.close()
+plt.plot(df1.capital)
+plot_vol(nzr(df1))
+print(nzr(df1).std() * np.sqrt(253))
+
 exit()
 # df2 = alpha2.run_simulation()
 # df3 = alpha3.run_simulation()

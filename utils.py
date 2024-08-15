@@ -132,6 +132,10 @@ class Alpha():
         
         return
     
+    def get_strat_scaler(self, target_vol, ewmas, ewstrats):
+        ann_realized_vol = np.sqrt(ewmas[-1] * 253)
+        return target_vol / ann_realized_vol * ewstrats[-1]
+    
     def run_simulation(self):
         
         print("RUNNING BACKTEST")
@@ -141,7 +145,10 @@ class Alpha():
         self.compute_meta_info(trade_range=date_range)
         
         portfolio_df = self.init_portfolio_settings(trade_range=date_range)
-
+        
+        self.ewmas, self.ewstrats = [0.01], [1]
+        self.strat_scalars = []
+        
         # Loop through the dates
         for i in portfolio_df.index:
             
@@ -154,11 +161,19 @@ class Alpha():
             # Non-eligible stocks to be traded on a particular day
             non_eligibles = [inst for inst in self.insts if inst not in eligibles]
             
+            strat_scalar = 2
+            
             # Compute daily PNL, capital return
             if i != 0:
                 
                 # Previous date
                 date_prev = portfolio_df.loc[i-1, "datetime"]
+                
+                strat_scalar = self.get_strat_scaler(
+                    target_vol = self.portfolio_vol,
+                    ewmas = self.ewmas,
+                    ewstrats = self.ewstrats
+                )
                 
                 day_pnl, capital_ret = get_pnl_stats(
                     date=date, 
@@ -168,6 +183,11 @@ class Alpha():
                     idx=i,
                     dfs=self.dfs
                 )
+                
+                self.ewmas.append(0.06 * (capital_ret ** 2) + 0.94 * self.ewmas[-1] if capital_ret != 0 else self.ewmas[-1])
+                self.ewstrats.append(0.06 * strat_scalar + 0.94 * self.ewstrats[-1] if capital_ret != 0 else self.ewstrats[-1])
+                
+            self.strat_scalars.append(strat_scalar)
             
             forecasts, forecast_chips = self.compute_signal_distribution(eligibles, date)
             
@@ -185,13 +205,13 @@ class Alpha():
             # Calculating allocation of capital on trades, position, and updating nominal total
             for inst in eligibles:
                 
-                # Go long if its in the long list, short if in the short list
                 forecast = forecasts[inst]
                 
                 scaled_forecast = forecast / forecast_chips if forecast_chips != 0 else 0
                 
                 position = \
                     scaled_forecast \
+                    * strat_scalar \
                     * vol_target \
                     / (self.dfs[inst].loc[date, "vol"] * self.dfs[inst].loc[date, "close"])
                 
