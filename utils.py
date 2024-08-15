@@ -53,7 +53,11 @@ def get_pnl_stats(date, prev, portfolio_df, insts, idx, dfs):
 
 import pandas as pd
 import numpy as np
-# from datetime import timedelta
+
+from copy import deepcopy
+
+class AbstractImplementationException(Exception):
+    pass
 
 class Alpha():
 
@@ -61,11 +65,12 @@ class Alpha():
     # dfs: historical data of each stock
     # start: start date
     # end: end date
-    def __init__(self, insts, dfs, start, end):
+    def __init__(self, insts, dfs, start, end, portfolio_vol = 0.2):
         self.insts = insts
-        self.dfs = dfs
+        self.dfs = deepcopy(dfs)
         self.start = start
         self.end = end
+        self.portfolio_vol = portfolio_vol
     
     # Creating a "skeleton" portfolio with corresponding trade range
     def init_portfolio_settings(self, trade_range):
@@ -77,13 +82,29 @@ class Alpha():
         
         # Create a new column "capital", and set the amount
         portfolio_df.loc[0, "capital"] = 10000
+        portfolio_df.loc[0, "day_pnl"] = 0.0
+        portfolio_df.loc[0, "capital_ret"] = 0.0
+        portfolio_df.loc[0, "nominal_ret"] = 0.0
         
         return portfolio_df
      
+    def pre_compute(self, trade_range):
+        pass
+     
+    def post_compute(self, trade_range):
+        pass
+    
+    def compute_signal_distribution(self, eligible, date):
+        raise AbstractImplementationException("no concrete implementation for signal generation")
+    
     def compute_meta_info(self, trade_range):
+        
+        self.pre_compute(trade_range=trade_range)
         
         for inst in self.insts:
             df = pd.DataFrame(index=trade_range)
+            
+            inst_vol = (self.dfs[inst]["close"] / self.dfs[inst]["close"].shift(1) - 1).rolling(30).std()
             
             # Keeping index consistent across all dfs
             self.dfs[inst] = df.join(self.dfs[inst]).ffill().bfill()
@@ -91,6 +112,12 @@ class Alpha():
             # Obtaining daily percentage returns
             # Daily return = (Today price / Yesterday price) - 1
             self.dfs[inst]["ret"] = self.dfs[inst]["close"] / self.dfs[inst]["close"].shift(1) - 1
+            
+            self.dfs[inst]["vol"] = inst_vol
+            
+            self.dfs[inst]["vol"] = self.dfs[inst]["vol"].ffill().fillna(0)
+            
+            self.dfs[inst]["vol"] = np.where(self.dfs[inst]["vol"] < 0.005, 0.005, self.dfs[inst]["vol"])
             
             # Detects if two consecutive prices are identical
             sampled = self.dfs[inst]["close"] != self.dfs[inst]["close"].shift(1).bfill()
@@ -100,20 +127,16 @@ class Alpha():
             
             # Want only elibgible stocks
             self.dfs[inst]["eligible"] = eligible.astype(int) & (self.dfs[inst]["close"] > 0).astype(int)
-            
+        
+        self.post_compute(trade_range=trade_range)
+        
         return
     
     def run_simulation(self):
         
-        print("running backtest")
+        print("RUNNING BACKTEST")
         
-        # OLD
         date_range = pd.date_range(start=self.start, end=self.end, freq="D")
-        
-        # NEW
-        # start = self.start + timedelta(hours=5)
-        # end = self.end + timedelta(hours=5)
-        # date_range = pd.date_range(start, end, freq="D")
         
         self.compute_meta_info(trade_range=date_range)
         
@@ -146,28 +169,15 @@ class Alpha():
                     dfs=self.dfs
                 )
             
-            alpha_scores = {}
-            
-            # Compute alpha signals (random for demonstrative purposes)
-            import random
-            
-            for inst in eligibles:
-                alpha_scores[inst] = random.uniform(0,1)
-            
-            # Trade top 25% "high" alpha tickers
-            # Short bottom 25% "low" alpha tickers
-            alpha_scores = {k:v for k,v in sorted(alpha_scores.items(), key=lambda pair:pair[1])}
-            
-            # List of top 25% "high" alpha tickers to go long
-            alpha_long = list(alpha_scores.keys())[-int(len(eligibles)/4):]
-            
-            # List of bottom 25% "low" alpha tickers to go short
-            alpha_short = list(alpha_scores.keys())[:int(len(eligibles)/4)]
+            forecasts, forecast_chips = self.compute_signal_distribution(eligibles, date)
             
             # Ignore trading non eligibles
             for inst in non_eligibles:
                 portfolio_df.loc[i, "{} w".format(inst)] = 0
                 portfolio_df.loc[i, "{} units".format(inst)] = 0
+            
+            # 
+            vol_target = (self.portfolio_vol / np.sqrt(253)) * portfolio_df.loc[i, "capital"]
             
             # Nominal total of portfolio
             nominal_tot = 0
@@ -176,13 +186,14 @@ class Alpha():
             for inst in eligibles:
                 
                 # Go long if its in the long list, short if in the short list
-                forecast = 1 if inst in alpha_long else (-1 if inst in alpha_short else 0)
+                forecast = forecasts[inst]
                 
-                # capital divided equally among number of long and shorted stocks
-                dollar_allocation = portfolio_df.loc[i, "capital"] / (len(alpha_long) + len(alpha_short))
+                scaled_forecast = forecast / forecast_chips if forecast_chips != 0 else 0
                 
-                # (long or short) * dollar amount / closing price
-                position = forecast * dollar_allocation / self.dfs[inst].loc[date, "close"]
+                position = \
+                    scaled_forecast \
+                    * vol_target \
+                    / (self.dfs[inst].loc[date, "vol"] * self.dfs[inst].loc[date, "close"])
                 
                 # create a new column outline the position: "'ticker' units"
                 portfolio_df.loc[i, inst + " units"] = position
@@ -212,12 +223,5 @@ class Alpha():
             portfolio_df.loc[i, "leverage"] = nominal_tot / portfolio_df.loc[i, "capital"]
 
             if i % 100 == 0: print(portfolio_df.loc[i])
-            # input(portfolio_df.loc[i])
-            
-        print(alpha_scores)
-        print(alpha_long)
-        print(alpha_short)
         
-        return portfolio_df 
-
-            # compute positions and other information
+        return portfolio_df
