@@ -113,6 +113,7 @@ def get_ticker_dfs(start, end):
         
     return tickers, ticker_dfs
 
+from utils import Alpha
 from utils import save_pickle, load_pickle
 
 period_start = datetime(2010,1,1, tzinfo = pytz.utc) 
@@ -129,57 +130,42 @@ tickers = tickers[:testfor]
 from alpha1 import Alpha1
 from alpha2 import Alpha2
 from alpha3 import Alpha3
+from utils import Portfolio
 
 alpha1 = Alpha1(insts=tickers, dfs=ticker_dfs, start=period_start, end=period_end)
 alpha2 = Alpha2(insts=tickers, dfs=ticker_dfs, start=period_start, end=period_end)
 alpha3 = Alpha3(insts=tickers, dfs=ticker_dfs, start=period_start, end=period_end)
 
-df1 = alpha1.run_simulation()
-
-import numpy as np
-import matplotlib.pyplot as plt
-
-# remove non-zero values from capital returns
-nzr = lambda df: df.capital_ret.loc[df.capital_ret != 0].fillna(0)
-
-def plot_vol(r):
-
-    vol = r.rolling(25).std() * np.sqrt(253)
-    plt.plot(vol)
-    plt.show()
-    plt.close()
-plt.plot(df1.capital)
-plot_vol(nzr(df1))
-print(nzr(df1).std() * np.sqrt(253))
-
-exit()
+# df1 = alpha1.run_simulation()
+# print(df1)
 # df2 = alpha2.run_simulation()
+# print(df2)
 # df3 = alpha3.run_simulation()
+# print(df3)
 
-df1, df2, df3 = load_pickle("simulations.obj") #(df1, df2, df3))
+# Cached df data
+(df1, df2, df3) = load_pickle("simulations.obj")
 
-import matplotlib.pyplot as plt
+df1 = df1.set_index("datetime", drop=True)
+df2 = df2.set_index("datetime", drop=True)
+df3 = df3.set_index("datetime", drop=True)
 
-plt.plot(df1.capital)
-plt.plot(df2.capital)
-plt.plot(df3.capital)
-plt.show()
-plt.close()
-
-# remove non-zero values from capital returns
-nzr = lambda df: df.capital_ret.loc[df.capital_ret != 0].fillna(0)
+portfolio = Portfolio(insts=tickers, dfs=ticker_dfs, start=period_start, end=period_end, stratdfs=[df1,df2,df3])
+df4 = portfolio.run_simulation()
 
 import numpy as np
+import matplotlib.pyplot as plt
 
-def plot_vol(r):
+logret = lambda df: np.log((1 + df.capital_ret).cumprod())
 
-    vol = r.rolling(25).std() * np.sqrt(253)
-    plt.plot(vol)
-    plt.show()
-    plt.close()
+plt.plot(logret(df1), label="1")
+plt.plot(logret(df2), label="2")
+plt.plot(logret(df3), label="3")
+plt.plot(logret(df4), label="4")
+plt.legend()
+plt.show()
+
+nzr = lambda df : df.capital_ret.loc[df.capital_ret != 0]
+
+print(np.std(nzr(df4)) * np.sqrt(253))
     
-plot_vol(nzr(df1))
-plot_vol(nzr(df2))
-plot_vol(nzr(df3))
-
-print(nzr(df1).std() * np.sqrt(253), nzr(df2).std() * np.sqrt(253), nzr(df3).std() * np.sqrt(253))

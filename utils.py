@@ -65,6 +65,7 @@ class Alpha():
     # dfs: historical data of each stock
     # start: start date
     # end: end date
+    # portfolio_vol: target portfolio volatility
     def __init__(self, insts, dfs, start, end, portfolio_vol = 0.2):
         self.insts = insts
         self.dfs = deepcopy(dfs)
@@ -196,7 +197,7 @@ class Alpha():
                 portfolio_df.loc[i, "{} w".format(inst)] = 0
                 portfolio_df.loc[i, "{} units".format(inst)] = 0
             
-            # 
+            # Target volatility sizing for each insturment
             vol_target = (self.portfolio_vol / np.sqrt(253)) * portfolio_df.loc[i, "capital"]
             
             # Nominal total of portfolio
@@ -241,7 +242,42 @@ class Alpha():
             
             # Create a leverage column
             portfolio_df.loc[i, "leverage"] = nominal_tot / portfolio_df.loc[i, "capital"]
-
-            if i % 100 == 0: print(portfolio_df.loc[i])
         
-        return portfolio_df
+        return portfolio_df.set_index("datetime", drop=True)
+
+from collections import defaultdict
+class Portfolio(Alpha):
+
+    def __init__(self, insts, dfs, start, end, stratdfs):
+        super().__init__(insts, dfs, start, end)
+        self.stratdfs=stratdfs
+     
+    def post_compute(self, trade_range):
+        
+        self.positions = {}
+        
+        for inst in self.insts:
+            
+            inst_weights = pd.DataFrame(index=trade_range)
+            
+            for i in range(len(self.stratdfs)):
+                inst_weights[i] = self.stratdfs[i]["{} w".format(inst)]\
+                    * self.stratdfs[i]["leverage"]
+                
+                inst_weights[i] = inst_weights[i].ffill().fillna(0.0)
+            
+            self.positions[inst] = inst_weights
+        
+    
+    def compute_signal_distribution(self, eligibles, date):
+        
+        forecasts = defaultdict(float)
+
+        for inst in self.insts:
+            for i in range(len(self.stratdfs)):
+                # Parity risk allocation
+                forecasts[inst] += self.positions[inst].loc[date, i] * (1 / len(self.stratdfs))
+        
+        forecast_chips = np.sum(np.abs(list(forecasts.values())))
+        
+        return forecasts, forecast_chips
