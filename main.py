@@ -5,6 +5,7 @@ import threading
 import pandas as pd
 from datetime import datetime
 from bs4 import BeautifulSoup
+from utils import timeme
 
 # Obtain S&P 500 tickers as a list
 def get_sp500_tickers():

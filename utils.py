@@ -1,6 +1,19 @@
 import lzma
 import dill as pickle
 
+import time
+from functools import wraps
+
+def timeme(func):
+    @wraps(func)
+    def timeddiff(*args, **kwargs):
+        a = time.time()
+        result = func(*args, **kwargs)
+        b = time.time()
+        print(f"@timeme: {func.__name__} took {b - a} seconds")
+        return result
+    return timeddiff 
+
 def load_pickle(path):
     
     with lzma.open(path, "rb") as fp:
