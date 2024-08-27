@@ -52,7 +52,7 @@ class Alpha1(Alpha):
         alpha_scores = {}
         
         for inst in eligibles:
-            alpha_scores[inst] = self.dfs[inst].loc[date, "alpha"]
+            alpha_scores[inst] = self.dfs[inst].at[date, "alpha"]
         
         # Trade top 25% "high" alpha tickers
         # Short bottom 25% "low" alpha tickers
